@@ -11,7 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ['id', 'is_staff', 'avatar', 'nickname', 'email', 'first_name', 'last_name', 'phone', 'date_of_birth',
+        fields = ['id', 'is_staff', 'is_active', 'avatar', 'nickname', 'email', 'first_name', 'last_name', 'phone', 'date_of_birth',
                   'password', 'speciality', 'doctor_speciality', 'education', 'description', 'experience', 'role']
 
     @staticmethod
