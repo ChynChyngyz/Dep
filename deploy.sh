@@ -9,7 +9,10 @@ echo "Обновляем систему..."
 apt update && apt upgrade -y
 
 echo "Устанавливаем Docker, Docker Compose и другие зависимости..."
-apt install -y docker.io docker-compose git
+apt install -y docker.io git
+
+curl -L https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 
 docker --version
 docker-compose --version
@@ -28,10 +31,7 @@ cd /home/ubuntu/django
 echo "Запускаем Docker Compose..."
 docker-compose up --build -d
 
-# Запуск Nginx (если он не запускается через docker-compose, можно запустить его вручную)
 echo "Перезапускаем Nginx..."
-systemctl restart nginx
+docker-compose restart nginx
 
 docker ps
-
-clear
