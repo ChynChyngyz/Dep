@@ -1,14 +1,14 @@
 import datetime
 
-from django import forms
-
+from datetime import timedelta
 from web import settings
 from django.core.mail import send_mail
 
-from .models import Appointment, Timetable
+from .models import Appointment, Timetable, ClinicTime
 
 
 def send_email_for_patient(email, appointment: Appointment):
+    service_name = appointment.service if appointment.service else 'Не указана'
 
     send_mail(
         'Запись на прием',
@@ -34,61 +34,71 @@ def send_email_for_patient_update(email, appointment: Appointment):
     )
 
 
-def get_week_days(days):
-    """
-    Функция для получения рабочих дней недели врача.
-    """
-    days_dict = {
-        0: 'Понедельник',
-        1: 'Вторник',
-        2: 'Среда',
-        3: 'Четверг',
-        4: 'Пятница',
-        5: 'Суббота',
-        6: 'Воскресенье'
+def days_of_week(date):
+    days_of_week = {
+        0: "Понедельник",
+        1: "Вторник",
+        2: "Среда",
+        3: "Четверг",
+        4: "Пятница",
+        5: "Суббота",
+        6: "Воскресенье",
     }
-    tmp_list = [days_dict.get(day) for day in days]
-    return ', '.join(tmp_list)
+
+    if isinstance(date, str):
+        date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
+
+    day_of_week = date.weekday()
+
+    return days_of_week[day_of_week]
 
 
-# def check_doctor_service(doctor, service):
-#
-#     if doctor.speciality != service.speciality:
-#         raise forms.ValidationError('Выбранная услуга не оказывается врачом')
+def is_valid_appointment_time(appointment_time, doctor, appointment_date):
+    errors = []
 
+    day_of_week = appointment_date.weekday()
 
-def check_doctor_timetable_date(date, doctor):
+    timetable = Timetable.objects.filter(doctor=doctor, day_of_visit=day_of_week).first()
 
-    try:
-        timetable = Timetable.objects.get(doctor=doctor, day_of_visit=date.weekday())
-    except Timetable.DoesNotExist:
-        raise forms.ValidationError(
-            f'У врача нет приема в этот день. Рабочие дни: {get_week_days(doctor.timetable.all())}')
+    if not timetable:
+        errors.append(f"В выбранный день врач {doctor} не принимает пациентов.")
+        return errors
 
-    if date <= datetime.date.today():
-        raise forms.ValidationError(
-            'Запись доступна только на завтра и далее. Вы не можете записаться на сегодня или в прошлое.')
+    # Получаем время работы клиники
+    clinic_time = ClinicTime.objects.first()
 
-    return timetable
+    if not clinic_time:
+        errors.append("Не настроены часы работы клиники.")
+        return errors
 
+    if isinstance(appointment_time, str):
+        appointment_time = datetime.datetime.strptime(appointment_time, "%H:%M").time()
 
-def check_appointment_time(all_time, time, start_work, end_work):
+    if not (clinic_time.work_start_time <= appointment_time <= clinic_time.work_end_time):
+        errors.append(f"В выбранное время клиника не работает.")
 
-    if start_work <= time <= end_work:
-        if not all_time or min(all_time) >= datetime.time(start_work.hour + 1):
-            next_free_time = start_work
-        else:
-            next_free_time = datetime.time(start_work.hour + 1)
-            for cur_time in all_time:
-                if datetime.time(cur_time.hour - 1, cur_time.minute) < next_free_time:
-                    next_free_time = datetime.time(cur_time.hour + 1, cur_time.minute)
-        if next_free_time >= end_work:
-            raise forms.ValidationError('Записи на этот день нет. Выберите другую дату')
-        for cur_time in all_time:
-            if cur_time <= time < datetime.time(cur_time.hour + 1, cur_time.minute):
-                raise forms.ValidationError(f'Время {time.strftime("%H:%M")} '
-                                            f'уже занято. Ближайшее свободное время '
-                                            f'{next_free_time.strftime("%H:%M")}')
-    else:
-        raise forms.ValidationError(f'Время работы клиники '
-                                    f'с {start_work.strftime("%H:%M")} до {end_work.strftime("%H:%M")}')
+    if clinic_time.lunch_start_time <= appointment_time < clinic_time.lunch_end_time:
+        errors.append("Выбранное время попадает в обеденный перерыв.")
+
+    if clinic_time.break_start_time <= appointment_time < clinic_time.break_end_time:
+        errors.append("Выбранное время попадает в полдник.")
+
+    existing_appointments = Appointment.objects.filter(
+        doctor=doctor,
+        date=appointment_date,
+    )
+
+    for appointment in existing_appointments:
+
+        appointment_start_time = datetime.datetime.combine(appointment_date, appointment.time)
+        appointment_end_time = appointment_start_time + timedelta(minutes=30)
+
+        new_appointment_start = datetime.datetime.combine(appointment_date, appointment_time)
+
+        print(f"Checking: New appointment time: {new_appointment_start}, Appointment start: {appointment_start_time}, Appointment end: {appointment_end_time}")
+
+        if new_appointment_start < appointment_end_time and new_appointment_start + timedelta(minutes=30) > appointment_start_time:
+            errors.append("Выбранное время пересекается с другой записью.")
+            break
+
+    return errors

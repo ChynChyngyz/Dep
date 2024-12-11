@@ -4,9 +4,7 @@ from authUser.models import CustomUser
 
 
 class Service(models.Model):
-    """
-    Класс модели услуга.
-    """
+
     DoesNotExist = None
     objects = None
 

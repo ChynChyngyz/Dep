@@ -1,4 +1,6 @@
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -7,8 +9,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .serializers import UserSerializer, DoctorSerializer
 from .models import CustomUser
+from .utils import confirmation_token
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 
 class RegisterView(APIView):
@@ -21,35 +24,85 @@ class RegisterView(APIView):
         tags=["Register"],
     )
     def post(self, request):
-
+        # email, password, nickname = (request.data.get("email"), request.data.get("password"),
+        #                              request.data.get("nickname"))
         serializer = UserSerializer(data=request.data)
 
         if serializer.is_valid():
             user = serializer.save(is_active=True)
 
-            return Response({"message": "User created successfully, please confirm registration"},
+            token = confirmation_token.make_token(user)
+
+            confirmation_register_url = request.build_absolute_uri(
+                reverse('register_confirm', kwargs={'pk': user.pk, 'token': token})
+            )
+
+            send_mail(
+                subject="Please confirm registration!",
+                message=f"Hi, {user.nickname}! Follow this link {confirmation_register_url}",
+                from_email="Bicos-Abricos@yandex.ru",
+                recipient_list=[user.email, ]
+            )
+            print(f"qwerty {user.email}")
+            return Response({"message": "User created successfully (please confirm registration)"},
                             status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class RegisterConfirmView(APIView):
+class PasswordReset(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(
-        request=None,
-        responses={200: UserSerializer(many=True)},
-        tags=["Register"],
+        request=UserSerializer,
+        responses={200: {"message": "Password reset link sent to your email"}},
+        tags=["Password"],
     )
-    def get(self, request, pk, token):
+    def post(self, request):
+        email = request.data.get("email")
+        user = CustomUser.objects.filter(email=email).first()
+
+        if user:
+            token = confirmation_token.make_token(user)
+
+            reset_password_url = request.build_absolute_uri(
+                reverse('password_reset_confirm', kwargs={'pk': user.pk, 'token': token})
+            )
+
+            send_mail(
+                subject="Password Reset Request",
+                message=f"Hi, {user.nickname}! To reset your password, follow this link: {reset_password_url}",
+                from_email="Bicos-Abricos@yandex.ru",
+                recipient_list=[user.email],
+            )
+            return Response({"message": "Password reset link sent to your email"}, status=status.HTTP_200_OK)
+
+        return Response({"error": "User not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResetPasswordConfirm(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        request=UserSerializer,
+        parameters=[OpenApiParameter('new_password', OpenApiTypes.STR, description='Новый пароль',
+                                     location=OpenApiParameter.PATH, )],
+        responses={201: {"message": "Password reset successful!"}},
+        tags=["Password"],
+    )
+    def post(self, request, token, pk):
         user = get_object_or_404(CustomUser, pk=pk)
 
-        if confirmation_token.check_token(user, token):
-            user.is_active = True
-            user.save()
-            return Response({"message": "Email successfully verified!"},
-                            status=status.HTTP_200_OK)
+        if not confirmation_token.check_token(user, token):
+            return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
+        new_password = request.data.get("new_password")
+
+        if new_password:
+            user.set_password(new_password)
+            user.save()
+            return Response({"message": "Password reset successful!"}, status=status.HTTP_201_CREATED)
+
+        return Response({"error": "Try again"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CurrentUserView(APIView):

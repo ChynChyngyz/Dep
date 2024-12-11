@@ -1,6 +1,10 @@
 from django.urls import path
-from .views import AppointmentListView, AppointmentCreateView, AppointmentUpdateView, AppointmentCancelView
-from .views import TimetableListView, TimetableCreateView, TimetableUpdateView, TimetableDeleteView
+from django.conf.urls.static import static
+from django.conf import settings
+
+from .views import (AppointmentListView, AppointmentCreateView, AppointmentUpdateView, AppointmentCancelView,
+                    TimetableListView, TimetableCreateView, TimetableUpdateView, TimetableDeleteView,
+                    )
 
 urlpatterns = [
     path('appointment-list/', AppointmentListView.as_view(), name='appointment-list'),
@@ -12,4 +16,4 @@ urlpatterns = [
     path('timetable-create/', TimetableCreateView.as_view(), name='timetable-create'),
     path('timetable-update/<int:pk>/', TimetableUpdateView.as_view(), name='timetable-update'),
     path('timetable-delete/<int:pk>/', TimetableDeleteView.as_view(), name='timetable-delete'),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

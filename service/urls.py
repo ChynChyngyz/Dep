@@ -1,6 +1,8 @@
 from django.urls import path
+from django.conf.urls.static import static
+from django.conf import settings
 
-from .views import (ServiceListView, ServiceDetailView, ServiceCreateView,
+from .views import (ServiceListView, ServiceCreateView,
                     ServiceUpdateView, ServiceDeleteView)
 
 
@@ -11,4 +13,4 @@ urlpatterns = [
     path('create/', ServiceCreateView.as_view(), name='service_create'),
     path('update/<int:pk>/', ServiceUpdateView.as_view(), name='service_update'),
     path('delete/<int:pk>/', ServiceDeleteView.as_view(), name='service_delete')
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

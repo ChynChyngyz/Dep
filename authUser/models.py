@@ -8,7 +8,7 @@ from speciality.models import Speciality
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, nickname, password=None, phone=None,
                     date_of_birth=None, avatar=None, role=None, **extra_fields):
-        if not email or not nickname:
+        if not email or not nickname or not phone:
             raise ValueError('Incorrect registration')
 
         email = self.normalize_email(email)
@@ -29,9 +29,7 @@ class CustomUserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, nickname, password=None, **extra_fields):
-        """
-        Создаёт и сохраняет суперпользователя.
-        """
+
         extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
@@ -46,14 +44,12 @@ class CustomUserManager(BaseUserManager):
 
     def create_doctor(self, email, nickname, password=None, speciality=None, experience=None, description=None,
                       education=None, **extra_fields):
-        """
-        Создаёт и сохраняет пользователя с ролью 'Doctor'.
-        """
+
         if not speciality or not education:
             raise ValueError('Incorrect registration')
 
         extra_fields.setdefault('is_active', True)
-        extra_fields.setdefault('is_staff', False)
+        extra_fields.setdefault('is_staff', True)
 
         doctor = self.create_user(email, nickname, password, role='Doctor', **extra_fields)
 
@@ -69,14 +65,14 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     DoesNotExist = None
     ROLE_CHOICES = [
-        ('Admin', 'Администратор'),
+        # ('Admin', 'Администратор'),
         ('Doctor', 'Доктор'),
         ('User', 'Пользователь'),
     ]
 
     email = models.EmailField(unique=True, verbose_name='Электронная почта')
     nickname = models.CharField(max_length=30, unique=True, verbose_name='Никнейм')
-    phone = models.CharField(max_length=15, verbose_name='Телефон', blank=True, null=True)
+    phone = models.CharField(max_length=15, verbose_name='Телефон')
     date_of_birth = models.DateField(blank=True, null=True, verbose_name='Дата рождения')
     avatar = models.ImageField(upload_to='users_avatar/', blank=True, null=True, verbose_name='Аватар пользователя')
 
@@ -91,12 +87,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         blank=True, null=True
     )
 
-    description = models.TextField(blank=True, null=True, verbose_name='Описание')  # Описание доктора
-    experience = models.PositiveIntegerField(blank=True, null=True, verbose_name='Опыт (в годах)')  # Для докторов
+    description = models.TextField(blank=True, null=True, verbose_name='Описание')
+    experience = models.PositiveIntegerField(blank=True, null=True, verbose_name='Опыт (в годах)')
     education = models.TextField(blank=True, null=True, verbose_name='Образование')
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='User', verbose_name='Роль')
-    is_active = models.BooleanField(default=False, verbose_name='Активен')  # default=True
+    is_active = models.BooleanField(default=False, verbose_name='Активен')
     is_staff = models.BooleanField(default=False, verbose_name='Сотрудник')
     is_superuser = models.BooleanField(default=False, verbose_name='Суперпользователь')
 

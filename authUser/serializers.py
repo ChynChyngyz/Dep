@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.validators import MinLengthValidator, MaxLengthValidator
 from rest_framework import serializers
 
 from speciality.serializers import SpecialitySerializer
@@ -9,9 +10,16 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     doctor_speciality = SpecialitySerializer(source='speciality', read_only=True)
 
+    nickname = serializers.CharField(
+        validators=[
+            MinLengthValidator(2),
+            MaxLengthValidator(20)
+        ]
+    )
+
     class Meta:
         model = get_user_model()
-        fields = ['id', 'is_staff', 'is_active', 'avatar', 'nickname', 'email', 'first_name', 'last_name', 'phone', 'date_of_birth',
+        fields = ['id', 'is_staff', 'avatar', 'nickname', 'email', 'first_name', 'last_name', 'phone', 'date_of_birth',
                   'password', 'speciality', 'doctor_speciality', 'education', 'description', 'experience', 'role']
 
     @staticmethod
@@ -45,6 +53,13 @@ class DoctorSerializer(serializers.ModelSerializer):
         model = get_user_model()
         fields = ['id', 'is_staff', 'avatar', 'nickname', 'email', 'first_name', 'last_name', 'phone', 'date_of_birth',
                   'password', 'speciality', 'doctor_speciality', 'education', 'description', 'experience', 'role']
+
+        nickname = serializers.CharField(
+            validators=[
+                MinLengthValidator(2),
+                MaxLengthValidator(20)
+            ]
+        )
 
     @staticmethod
     def create(validated_data, **kwargs):

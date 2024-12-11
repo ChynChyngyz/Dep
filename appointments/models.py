@@ -40,7 +40,7 @@ class Appointment(models.Model):
         verbose_name = 'Запись'
         verbose_name_plural = 'Записи'
 
-    def delete(self, *args, **kwargs):
+    def canceled(self, *args, **kwargs):
         self.status_of_appointment = 'CANCELLED'
         self.save()
 
@@ -62,8 +62,8 @@ class Timetable(models.Model):
         (6, 'Sunday'),
     )
 
-    doctor = models.ManyToManyField(CustomUser, verbose_name='Врач')
-    day_of_visit = models.PositiveSmallIntegerField(choices=DAYS_OF_WEEK, unique=True, verbose_name='День приема')
+    doctor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='Врач')
+    day_of_visit = models.PositiveSmallIntegerField(choices=DAYS_OF_WEEK, verbose_name='День приема')
 
     def __str__(self):
         return f'{self.day_of_visit} {self.doctor}'
@@ -71,3 +71,28 @@ class Timetable(models.Model):
     class Meta:
         verbose_name = 'Расписание'
         verbose_name_plural = 'Расписания'
+
+
+class ClinicTime(models.Model):
+
+    # doctor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='Врач')
+    # day_of_week = models.PositiveSmallIntegerField(choices=Timetable.DAYS_OF_WEEK, verbose_name='День недели')
+
+    work_start_time = models.TimeField(verbose_name='Начало рабочего дня')
+    work_end_time = models.TimeField(verbose_name='Конец рабочего дня')
+
+    lunch_start_time = models.TimeField(verbose_name='Начало обеда')
+    lunch_end_time = models.TimeField(verbose_name='Конец обеда')
+
+    break_start_time = models.TimeField(verbose_name='Начало полдника')
+    break_end_time = models.TimeField(verbose_name='Конец полдника')
+
+    def __str__(self):
+        return f'Часы работы клиники: {self.work_start_time} - {self.work_end_time}'
+
+    class Meta:
+        verbose_name = 'Часы работы клиники'
+        verbose_name_plural = 'Часы работы клиники'
+
+    # def get_day_of_week_display(self):
+    #     return dict(Timetable.DAYS_OF_WEEK).get(self.day_of_week, 'Неизвестный день')
