@@ -1,3 +1,8 @@
+import requests
+
+from web import settings
+
+from django.http import JsonResponse
 from drf_spectacular.utils import extend_schema, OpenApiTypes, OpenApiParameter
 
 from rest_framework import status
@@ -8,6 +13,30 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Appointment, Timetable
 from .serializers import AppointmentSerializer, TimetableSerializer
 from .utils import (send_email_for_patient, send_email_for_patient_update, is_valid_appointment_time)
+
+
+class Weather(APIView):
+
+    def get(self, request, city):
+        url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={settings.OPENWEATHERMAP_API_KEY}'
+        response = requests.get(url, verify=False)
+        if response.status_code != 200:
+            return JsonResponse({"error": "Weather data not available"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        data = response.json()
+        return JsonResponse(data)
+
+
+class CurrencyLayer(APIView):
+
+    def get(self, request):
+        url = f"https://v6.exchangerate-api.com/v6/{settings.CURRENCYLAYER_API_KEY}/latest/USD"
+        response = requests.get(url, verify=False)
+        if response.status_code != 200:
+            return JsonResponse({"error": "Weather data not available"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        data = response.json()
+        return JsonResponse(data)
 
 
 class AppointmentListView(APIView):
