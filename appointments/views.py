@@ -8,8 +8,10 @@ from drf_spectacular.utils import extend_schema, OpenApiTypes, OpenApiParameter
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 
+from .filters import *
 from .models import Appointment, Timetable
 from .serializers import AppointmentSerializer, TimetableSerializer
 from .utils import (send_email_for_patient, send_email_for_patient_update, is_valid_appointment_time)
@@ -30,7 +32,7 @@ class Weather(APIView):
 class CurrencyLayer(APIView):
 
     def get(self, request):
-        url = f"https://v6.exchangerate-api.com/v6/{settings.CURRENCYLAYER_API_KEY}/latest/USD"
+        url = f"http://v6.exchangerate-api.com/v6/{settings.CURRENCYLAYER_API_KEY}/latest/USD"
         response = requests.get(url, verify=False)
         if response.status_code != 200:
             return JsonResponse({"error": "Weather data not available"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -40,10 +42,8 @@ class CurrencyLayer(APIView):
 
 
 class AppointmentListView(APIView):
-    """
-    Класс для вывода списка записей к врачу.
-    """
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     @extend_schema(
         request=None,
@@ -51,12 +51,23 @@ class AppointmentListView(APIView):
         tags=["Appointments"]
     )
     def get(self, request):
-        """
-        Метод для получения списка записей к врачу.
-        """
-        appointments = Appointment.objects.all()  # Получаем все записи
-        serializer = AppointmentSerializer(appointments, many=True)  # Сериализуем данные
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        filterset = AppointmentFilter(request.GET, queryset=Appointment.objects.all())
+
+        if filterset.is_valid():
+            appointments = filterset.qs.order_by('id')
+        else:
+            return Response({"count": 0,
+                             "next": None,
+                             "previous": None,
+                             "results": []
+                             }, status=status.HTTP_200_OK)
+
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(appointments, request)
+
+        serializer = AppointmentSerializer(paginated_data, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class AppointmentCreateView(APIView):
@@ -179,6 +190,36 @@ class AppointmentCancelView(APIView):
         return Response({"message": "Appointment canceled successfully."}, status=status.HTTP_204_NO_CONTENT)
 
 
+class TimetableListView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
+
+    @extend_schema(
+        request=None,
+        responses={200: TimetableSerializer(many=True)},
+        tags=["Timetables"]
+    )
+    def get(self, request):
+
+        filterset = TimetableFilter(request.GET, queryset=Timetable.objects.all())
+
+        if filterset.is_valid():
+            timetables = filterset.qs.order_by('id')
+        else:
+            return Response({"count": 0,
+                             "next": None,
+                             "previous": None,
+                             "results": []
+                             }, status=status.HTTP_200_OK)
+
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(timetables, request)
+
+        serializer = TimetableSerializer(paginated_data, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
 class TimetableCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -209,22 +250,6 @@ class TimetableCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class TimetableListView(APIView):
-
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(
-        request=None,
-        responses={200: TimetableSerializer(many=True)},
-        tags=["Timetables"]
-    )
-    def get(self, request):
-
-        timetables = Timetable.objects.all()
-        serializer = TimetableSerializer(timetables, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TimetableUpdateView(APIView):

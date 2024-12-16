@@ -1,13 +1,9 @@
 from django.db import models
-
-from service.models import Service
+from django.utils.timezone import now
 from authUser.models import CustomUser
 
 
 class Appointment(models.Model):
-    """
-    Класс модели запись на обследование.
-    """
 
     DoesNotExist = None
     objects = None
@@ -16,8 +12,8 @@ class Appointment(models.Model):
         ('WAITING', 'Ожидание'),
         ('COMPLETED', 'Завершен'),
         ('CANCELLED', 'Отменен'),
+        ('EXPIRED', 'Выгоревший'),
     ]
-
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='appointments_as_user', verbose_name='Пользователь')
     doctor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='appointments_as_doctor', verbose_name='Доктор')
@@ -40,15 +36,22 @@ class Appointment(models.Model):
         verbose_name = 'Запись'
         verbose_name_plural = 'Записи'
 
+    def check_if_expired(self):
+        if self.date < now().date():
+            self.status_of_appointment = 'EXPIRED'
+            self.save()
+
+    def save(self, *args, **kwargs):
+        self.check_if_expired()
+        super().save(*args, **kwargs)
+
     def canceled(self, *args, **kwargs):
         self.status_of_appointment = 'CANCELLED'
         self.save()
 
 
 class Timetable(models.Model):
-    """
-    Класс для расписания.
-    """
+
     DoesNotExist = None
     objects = None
 
@@ -75,9 +78,6 @@ class Timetable(models.Model):
 
 class ClinicTime(models.Model):
 
-    # doctor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name='Врач')
-    # day_of_week = models.PositiveSmallIntegerField(choices=Timetable.DAYS_OF_WEEK, verbose_name='День недели')
-
     work_start_time = models.TimeField(verbose_name='Начало рабочего дня')
     work_end_time = models.TimeField(verbose_name='Конец рабочего дня')
 
@@ -94,5 +94,3 @@ class ClinicTime(models.Model):
         verbose_name = 'Часы работы клиники'
         verbose_name_plural = 'Часы работы клиники'
 
-    # def get_day_of_week_display(self):
-    #     return dict(Timetable.DAYS_OF_WEEK).get(self.day_of_week, 'Неизвестный день')

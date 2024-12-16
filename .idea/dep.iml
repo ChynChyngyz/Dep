@@ -8,10 +8,18 @@
     <option name="namespacePackageFolders">
       <list>
         <option value="$MODULE_DIR$/appointments" />
+        <option value="$MODULE_DIR$/authUser" />
+        <option value="$MODULE_DIR$/service" />
+        <option value="$MODULE_DIR$/speciality" />
       </list>
     </option>
   </component>
   <component name="TemplatesService">
     <option name="TEMPLATE_CONFIGURATION" value="Django" />
+    <option name="TEMPLATE_FOLDERS">
+      <list>
+        <option value="$MODULE_DIR$/web/templates" />
+      </list>
+    </option>
   </component>
 </module>

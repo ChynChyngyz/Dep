@@ -4,7 +4,10 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
 SECRET_KEY = 'django-insecure-v9b9_lk^sm07-np7m6^y+9^--m588bfd7nz2ukpd8li+=1niso'
+# SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'fallback-secret-key')
+# SECRET_KEY = 'django-insecure-v9b9_lk^sm07-np7m6^y+9^--m588bfd7nz2ukpd8li+=1niso'
 
 DEBUG = True
 
@@ -13,6 +16,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+ROOT_URLCONF = 'web.urls'
 
 ALLOWED_HOSTS = ["*"]
 
@@ -30,6 +35,7 @@ INSTALLED_APPS = [
     'appointments',
     'service',
     'drf_spectacular',
+    'django_filters',
 ]
 
 MIDDLEWARE = [
@@ -49,8 +55,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
 ]
 
-ROOT_URLCONF = 'web.urls'
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -69,6 +73,8 @@ TEMPLATES = [
 
 
 REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 3,
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],

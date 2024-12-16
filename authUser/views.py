@@ -3,13 +3,15 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from rest_framework import status
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-from .serializers import UserSerializer, DoctorSerializer
 from .models import CustomUser
+from .filters import UsersFilter
 from .utils import confirmation_token
+from .serializers import UserSerializer, DoctorSerializer
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
@@ -24,8 +26,6 @@ class RegisterView(APIView):
         tags=["Register"],
     )
     def post(self, request):
-        # email, password, nickname = (request.data.get("email"), request.data.get("password"),
-        #                              request.data.get("nickname"))
         serializer = UserSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -44,9 +44,29 @@ class RegisterView(APIView):
                 recipient_list=[user.email, ]
             )
             print(f"qwerty {user.email}")
-            return Response({"message": "User created successfully (please confirm registration)"},
+            return Response({"message": "User created successfully, please confirm registration"},
                             status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegisterConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        request=None,
+        responses={200: UserSerializer(many=True)},
+        tags=["Register"],
+    )
+    def get(self, request, pk, token):
+        user = get_object_or_404(CustomUser, pk=pk)
+
+        if confirmation_token.check_token(user, token):
+            user.is_active = True
+            user.save()
+            return Response({"message": "Email successfully verified!"},
+                            status=status.HTTP_200_OK)
+
+        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PasswordReset(APIView):
@@ -128,6 +148,7 @@ class CurrentUserView(APIView):
 
 class AllUsersView(APIView):
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     @extend_schema(
         request=None,
@@ -139,9 +160,23 @@ class AllUsersView(APIView):
             return Response({"error": "Access denied. Only admin can perform this action"},
                             status=status.HTTP_403_FORBIDDEN)
 
-        users = CustomUser.objects.all()
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        filterset = UsersFilter(request.GET, queryset=CustomUser.objects.all())
+
+        if filterset.is_valid():
+            users = filterset.qs.order_by('id')
+        else:
+            return Response({"count": 0,
+                             "next": None,
+                             "previous": None,
+                             "results": []
+                             }, status=status.HTTP_200_OK)
+
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(users, request)
+
+        serializer = UserSerializer(paginated_data, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
 
 
 class DoctorView(APIView):

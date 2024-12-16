@@ -1,22 +1,20 @@
 from drf_spectacular.utils import extend_schema
 
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 
+from .filters import ServicesFilter
 from .models import Service
 from .serializers import ServiceSerializer
 
-# from speciality.models import Speciality
-# from authUser.models import CustomUser
-
 
 class ServiceListView(APIView):
-    """
-    Класс для вывода списка медицинских услуг.
-    """
+
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     @extend_schema(
         request=None,
@@ -24,71 +22,28 @@ class ServiceListView(APIView):
         tags=["Service"],
     )
     def get(self, request):
-        """
-        Метод для получения списка объектов услуга.
-        """
-        services = Service.objects.all()
-        serializer = ServiceSerializer(services, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
+        filterset = ServicesFilter(request.GET, queryset=Service.objects.all())
 
-class ServiceDetailView(APIView):
-    """
-    Класс для просмотра медицинской услуги.
-    """
-    permission_classes = [IsAuthenticated]
+        if filterset.is_valid():
+            services = filterset.qs.order_by('id')
+        else:
+            return Response({"count": 0,
+                             "next": None,
+                             "previous": None,
+                             "results": []
+                             }, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        request=None,
-        responses={200: ServiceSerializer(many=True)},
-        tags=["Service"],
-    )
-    def get(self, request, pk):
-        try:
-            service = Service.objects.get(pk=pk)
-        except Service.DoesNotExist:
-            return Response({"error": "Service not found"}, status=status.HTTP_404_NOT_FOUND)
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(services, request)
 
-        serializer = ServiceSerializer(service, data=request.data, partial=True)
-        service.get()
-        return Response({"message": "Service found successfully."}, status=status.HTTP_200_OK)
+        serializer = ServiceSerializer(paginated_data, many=True)
 
-
-# class SpecialityServiceListView(APIView):
-#     """
-#     Класс просмотра списка услуг специализации.
-#     """
-#     permission_classes = [IsAuthenticated]
-#
-#     @extend_schema(
-#         request=None,
-#         responses={200: ServiceSerializer(many=True)},
-#     )
-#     def get(self, request):
-#         """
-#         Метод для получения объектов услуг.
-#         """
-#         queryset = super().get_queryset()
-#         queryset = queryset.filter(speciality=self.kwargs.get('pk'))
-#
-#         return queryset
-#
-#     def get_context_data(self, *args, **kwargs):
-#         """
-#         Метод для получения списка объектов услуги.
-#         """
-#         context_data = super().get_context_data(*args, **kwargs)
-#
-#         speciality_item = Speciality.objects.get(pk=self.kwargs.get('pk'))
-#         context_data['speciality_pk'] = speciality_item.pk
-#
-#         return context_data
+        return paginator.get_paginated_response(serializer.data)
 
 
 class ServiceCreateView(APIView):
-    """
-    Класс для создания объекта Услуга.
-    """
+
     @extend_schema(
         request=ServiceSerializer,
         parameters=[ServiceSerializer],
@@ -96,9 +51,7 @@ class ServiceCreateView(APIView):
         tags=["Service"],
     )
     def post(self, request):
-        """
-        Метод для создания новой услуги.
-        """
+
         if request.user.role != 'Admin':
             return Response({"error": "Access denied. Only admin can perform this action"},
                             status=status.HTTP_403_FORBIDDEN)
@@ -114,9 +67,7 @@ class ServiceCreateView(APIView):
 
 
 class ServiceUpdateView(APIView):
-    """
-    Класс для редактирования объекта услуга.
-    """
+
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -150,9 +101,7 @@ class ServiceUpdateView(APIView):
 
 
 class ServiceDeleteView(APIView):
-    """
-    Класс для удаления объекта услуга.
-    """
+
     permission_classes = [IsAuthenticated]
 
     @extend_schema(

@@ -1,19 +1,20 @@
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated  # , IsAdminUser
 
+from .filters import SpecialitiesFilter
 from .models import Speciality
 from .serializers import SpecialitySerializer
 
 
 class SpecialityListView(APIView):
-    """
-    Класс для вывода списка специализаций.
-    """
+
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     @extend_schema(
         request=None,
@@ -21,29 +22,26 @@ class SpecialityListView(APIView):
         tags=["Speciality"],
     )
     def get(self, request):
-        """
-        Метод для получения списка специализаций.
-        """
-        specialities = Speciality.objects.all()  # Получаем все специализации
-        serializer = SpecialitySerializer(specialities, many=True)  # Сериализуем данные
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        filterset = SpecialitiesFilter(request.GET, queryset=Speciality.objects.all())
+
+        if filterset.is_valid():
+            specialities = filterset.qs.order_by('id')
+        else:
+            return Response({"count": 0,
+                             "next": None,
+                             "previous": None,
+                             "results": []
+                             }, status=status.HTTP_200_OK)
+
+        paginator = self.pagination_class()
+        paginated_data = paginator.paginate_queryset(specialities, request)
+
+        serializer = SpecialitySerializer(paginated_data, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
 
 
-# Класс для детального просмотра специализации
-# class SpecialityDetailView(APIView):
-#     """
-#     Класс для вывода детали специализации.
-#     """
-#     permission_classes = [IsAuthenticated]
-#
-#     def get(self, request):
-#         user, doctor = request.user, request.doctor
-#         return Response({
-#
-#         })
-
-
-# Класс для создания специализации
 class SpecialityCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -54,9 +52,7 @@ class SpecialityCreateView(APIView):
         tags=["Speciality"],
     )
     def post(self, request):
-        """
-        Метод для создания новой специализации.
-        """
+
         if request.user.role != 'Admin':
             return Response({"error": "Access denied. Only admin can perform this action"},
                             status=status.HTTP_403_FORBIDDEN)
@@ -77,17 +73,11 @@ class SpecialityUpdateView(APIView):
     @extend_schema(
         request=SpecialitySerializer,
         parameters=[SpecialitySerializer],
-        # parameters=[
-        #     OpenApiParameter('speciality_name', OpenApiTypes.STR, description='Название', location=OpenApiParameter.PATH,),
-        #     OpenApiParameter('description', OpenApiTypes.STR, description='Описание', location=OpenApiParameter.PATH)
-        # ],
         responses={201: {"message": "Speciality updated successful"}},
         tags=["Speciality"],
     )
     def put(self, request, pk):
-        """
-        Метод для обновления специализации.
-        """
+
         if request.user.role != 'Admin':
             return Response({"error": "Access denied. Only admin can perform this action"},
                             status=status.HTTP_403_FORBIDDEN)
@@ -116,9 +106,7 @@ class SpecialityDeleteView(APIView):
         tags=["Speciality"],
     )
     def delete(self, request, pk):
-        """
-        Метод для удаления специализации.
-        """
+
         if request.user.role != 'Admin':
             return Response({"error": "Access denied. Only admin can perform this action"},
                             status=status.HTTP_403_FORBIDDEN)
